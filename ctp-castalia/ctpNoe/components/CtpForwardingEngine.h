@@ -1,14 +1,14 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.0 (January 27, 2011)
+ * @version 1.01 (January 3, 2012)
  *
  * Acknowledgment: This code is based upon the implementation of CTP for TinyOS written by
  * Omprakash Gnawali, Philip Levis, Kyle Jamieson, and Rodrigo Fonseca.
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
 
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -325,6 +325,8 @@ public:
 
  	void event_send_sendDone(uint8_t err) ;
  	void event_LinkEstimator_evicted(am_addr_t neighbor) ;
+
+ 	uint8_t getSeqNo() ;
 
  	///////////////////////////////////////////////////////////////////
  	///////////////////////////////////////////////////////////////////

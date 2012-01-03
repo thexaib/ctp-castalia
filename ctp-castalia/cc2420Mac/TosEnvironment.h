@@ -1,7 +1,7 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.0 (January 27, 2011)
+ * @version 1.01 (January 3, 2012)
  */
 
 #ifndef _TOS_ENVIRONMENT_H_
@@ -71,12 +71,10 @@ inline uint8_t command_Random_rand8(int k){
 }
 
 inline uint16_t command_Random_rand16(int k){
-	int rvalue =  genk_intrand(k,0x10000) ; // random number in range [0,2^16)
-	return rvalue & 0xffff ;
+	return (uint16_t)genk_intrand(k,0x10000) ; // random number in range [0,2^16)
 }
 
 inline uint32_t command_Random_rand32(int k){
-	int rvalue = genk_intrand(k,0x100000000) ; // random number in range [0,2^32)
-	return rvalue & 0xffffffff ;
+	return (uint32_t) genk_intrand(k,0) ; // random number in range [0,2^32)
 }
 #endif

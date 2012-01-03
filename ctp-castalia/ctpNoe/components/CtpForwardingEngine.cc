@@ -4,11 +4,11 @@
  * Acknowledgment: This code is based upon the implementation of CTP for TinyOS written by
  * Omprakash Gnawali, Philip Levis, Kyle Jamieson, and Rodrigo Fonseca.
  *
- * @version 1.01 (April 15, 2011)
+ * @version 1.02 (January 3, 2012)
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
  
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -210,7 +210,7 @@ void CtpForwardingEngine::handleMessage(cMessage * msg){
 		}
 		case NETWORK_LAYER_PACKET:{
 			RoutingPacket* rt = check_and_cast<RoutingPacket*>(msg) ;
-			if(rt->getRoutingInteractionControl().nextHop == self){
+			if(rt->getNetMacInfoExchange().nextHop == self){
 				CtpData *netPkt = check_and_cast <CtpData*>(msg);
 				//			send(decapsulatePacket(netPkt),"toCtp") ;
 				event_SubReceive_receive(netPkt) ;
@@ -341,11 +341,13 @@ error_t CtpForwardingEngine::command_Send_send(cPacket* pkt, uint8_t len){
 	trace()<<"command_Send_send - Sending packet from client "<<(int)global_client<<" with length: "<<(int)len;
 	if (!running) {
 		collectOutput("Ctp Data","Tx Dropped - not running") ;
+		emit(registerSignal("CfeTxDroppedNotRunning"),self) ;
 		delete pkt ;
 		return EOFF;
 	}
 	if(len > TOSH_DATA_LENGTH){
 		collectOutput("Ctp Data","Tx Dropped - Too long") ;
+		emit(registerSignal("CfeTxDroppedTooLong"),self) ;
 		delete pkt ;
 		return ESIZE;
 	}
@@ -360,6 +362,7 @@ error_t CtpForwardingEngine::command_Send_send(cPacket* pkt, uint8_t len){
 	if (clientPtrs == NULL) {
 		trace()<<"Send.send - send failed as client is busy." ;
 		collectOutput("Ctp Data","Tx Dropped - busy") ;
+		emit(registerSignal("CfeTxDroppedEbusy"),self) ;
 		delete msg ;
 		return EBUSY;
 	}
@@ -413,6 +416,7 @@ void CtpForwardingEngine::sendTask(){
 	else if (! cre->command_RootControl_isRoot()  &&
 			! cre->command_Routing_hasRoute()) { // CHECK -> OK: retx called after 9.76 sec.
 		trace()<<"sendTask - No route, don't send, start retry timer." ;
+		emit(registerSignal("CfeTxDelayedNoRoute"),self) ;
 		setTimer(RETXTIMER,tosMillisToSeconds(10000)) ;
 
 		return;
@@ -426,6 +430,7 @@ void CtpForwardingEngine::sendTask(){
 		if (cre->command_CtpInfo_isNeighborCongested(dest)) { // NOT CHECKED
 			// Our parent is congested. We should wait.
 			// Don't repost the task, CongestionTimer will do the job
+			emit(registerSignal("CfeTxDelayedParentCongested"),self) ;
 			if (! parentCongested ) {
 				parentCongested = true;
 			}
@@ -441,6 +446,7 @@ void CtpForwardingEngine::sendTask(){
 		// Once we are here, we have decided to send the packet.
 		if(command_SentCache_lookup(qe->msg)){ // NOT CHECKED
 			collectOutput("Ctp Data","Tx Dropped - was in sent cache") ;
+			emit(registerSignal("CfeDupDroppedInSentCache"),self) ;
 			command_SendQueue_dequeue() ;
 			if(messagePool->command_Pool_put(qe->msg) != SUCCESS) trace() << "message pool error." ;
 			delete qe->msg ; // we need to delete the allocated packet.
@@ -460,7 +466,7 @@ void CtpForwardingEngine::sendTask(){
 		trace()<<"Sending queue entry." ;
 		if (cre->command_RootControl_isRoot()) { // CHECK -> OK: loppbacked message to app layer.
 			collectOutput("Ctp Data","Tx - Loopback Message") ;
-
+			emit(registerSignal("CfeTxOkIsLoopback"),self) ;
 			// there is a collectionid (needed for signal receive) that is useless in our implementation: it has been removed.
 			// here there is a memcpy for loopbackMsgPtr that we don't need to implement, we use msg->dup() instead later.
 			ackPending = false;
@@ -504,9 +510,11 @@ void CtpForwardingEngine::sendTask(){
 			sending = true;
 			trace()<<"sendTask - subsend succeeded." ;
 			if (qe->client < CLIENT_COUNT) {
+				emit(registerSignal("CfeTxOkClient"),self) ;
 				trace()<<"sendTask - client packet.";
 			}
 			else {
+				emit(registerSignal("CfeTxOkForwarded"),self) ;
 				trace()<<"sendTask - Forwarded packet." ;
 			}
 			return;
@@ -516,6 +524,7 @@ void CtpForwardingEngine::sendTask(){
 			// this is for the best. When the radio is turned back on, we'll
 			// handle a startDone event and resume sending.
 			radioOn = false;
+			emit(registerSignal("CfeTxDroppedRadioOff"),self) ;
 			trace()<<"sendTask - Subsend failed from EOFF." ;
 		}
 		else if (subsendResult == EBUSY) { // CHECKED -> OK
@@ -524,6 +533,7 @@ void CtpForwardingEngine::sendTask(){
 			// double-send (bug). This means we expect a sendDone, so just
 			// wait for that: when the sendDone comes in, // we'll try
 			// sending this packet again.
+			emit(registerSignal("CfeTxDroppedRadioEbusy"),self) ;
 			trace()<<"sendTask - Subsend failed from EBUSY" ;
 			// CASTALIA IMPLEMENTATION: this condition might happen when a "route found" is signaled from the RE and a ReTxTimer is running:
 			// the first event calls a post sendTask(), if the ReTxTimer fires before the sendDone, the sending flag is set to false and a new sendTask is called.
@@ -569,6 +579,7 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 	else if (error != SUCCESS) { // NOT CHECKED
 		// Immediate retransmission is the worst thing to do.
 		trace()<<"SubSend.sendDone - Send failed";
+		emit(registerSignal("CfeTxDoneFailed"),self) ;
 		startRetxmitTimer(SENDDONE_FAIL_WINDOW, SENDDONE_FAIL_OFFSET);
 	}
 	else if (ackPending && !command_PacketAcknowledgements_wasAcked(msg)) { // CHECK -> OK: see inner statements
@@ -577,6 +588,7 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 		cre->command_CtpInfo_recomputeRoutes() ;
 		if (--qe->retries) { // CHECK -> OK: packet retxmitted after SENDDONE_NOACK_WINDOW.
 			trace()<<"SubSend.sendDone - not acked.";
+			emit(registerSignal("CfeTxDoneNoAck"),self) ;
 			startRetxmitTimer(SENDDONE_NOACK_WINDOW, SENDDONE_NOACK_OFFSET);
 		} else { // CHECK -> OK: see inner statements
 			//max retries, dropping packet
@@ -585,9 +597,11 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 				clientPtrs = qe ;
 				delete qe->msg ; // Needed for OMNET++ : msg dup() in DualBuffer
 				signal_Send_sendDone(FAIL) ;
+				emit(registerSignal("CfeTxDoneDroppedMaxRetriesClient"),self) ;
 				trace()<<"Subsend.sendDone - Max retries reached for client packet, dropping." ;
 			} else { // CHECK -> OK: packet dropped as expected. No pools errors.
 				trace()<<"Subsend.sendDone - Max retries reached for forwarded packet, dropping." ;
+				emit(registerSignal("CfeTxDoneDroppedMacRetriesForwarded"),self) ;
 				if(messagePool->command_Pool_put(qe->msg) != SUCCESS) trace()<<"Message pool error.";
 				delete qe->msg ; // as stated in the forward function, the message is stored in another place than the messagePool, thus it must be deleted manually.
 				if(qEntryPool->command_Pool_put(qe) != SUCCESS) trace()<<"QEntryPool error." ;
@@ -600,7 +614,7 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 	else if (qe->client < CLIENT_COUNT) { // CHECK -> OK: packet successfully txmitted and removed from queue.
 		// there was a pointer to header that was never used... we have removed it.
 		trace()<<"silviastats 1 "<<self<<" "<<(int)cre->command_Routing_nextHop()<<" "<<(int)command_CtpPacket_getOrigin(qe->msg)<<" "<<(int)command_CtpPacket_getSequenceNumber(qe->msg)<<" "<<(int)command_CtpPacket_getThl(qe->msg) ;
-
+		emit(registerSignal("CfeTxDoneOkClient"),self) ;
 		uint8_t client = qe->client;
 		trace()<<"SubSend_sendDone - Our packet for client "<<(int)client<<" , remove from queue." ;
 		le->command_LinkEstimator_txAck(command_AMPacket_destination(msg)) ;
@@ -614,7 +628,7 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 	else if(messagePool->command_Pool_size() < messagePool->command_Pool_maxSize()){ // CHECK -> OK: packet forwarded and no errors pools.
 		// A successfully forwarded packet.
 		trace()<<"silviastats 1 "<<self<<" "<<(int)cre->command_Routing_nextHop()<<" "<<(int)command_CtpPacket_getOrigin(qe->msg)<<" "<<(int)command_CtpPacket_getSequenceNumber(qe->msg)<<" "<<(int)command_CtpPacket_getThl(qe->msg) ;
-
+		emit(registerSignal("CfeTxDoneOkForwarded"),self) ;
 		trace()<<"SubSend.sendDone - successfully forwarded (client: "<<(int)qe->client<<") packet, message pool is "<<(int)messagePool->command_Pool_size()<<"/"<<(int)messagePool->command_Pool_maxSize() ;
 		le->command_LinkEstimator_txAck(command_AMPacket_destination(msg)) ;
 		command_SentCache_insert(qe->msg) ;
@@ -632,6 +646,9 @@ void CtpForwardingEngine::event_SubSend_sendDone(cMessage* msg, error_t error){
 	}
 }
 
+uint8_t CtpForwardingEngine::getSeqNo(){
+	return seqno ;
+}
 
 
 /*
@@ -644,9 +661,11 @@ void CtpForwardingEngine::forward(cPacket* msg){
 	CtpData* m = check_and_cast<CtpData*>(msg) ;
 	collectOutput("Ctp Data","Rx - forward total") ;
 	if(messagePool->command_Pool_empty()){
+		emit(registerSignal("CfeTxDroppedMessagePoolFull"),self) ;
 		trace()<<"forward - cannot forward, message pool empty.";
 	}
 	else if(qEntryPool->command_Pool_empty()){
+		emit(registerSignal("CfeTxDroppedQentryPoolFull"),self) ;
 		trace()<<"forward - cannot forward, queue entry pool empty" ;
 	}
 	else {
@@ -657,6 +676,7 @@ void CtpForwardingEngine::forward(cPacket* msg){
 		qe = qEntryPool->command_Pool_get() ;
 		if (qe == NULL) {
 			collectOutput("Ctp Data","Forward Dropped - qEntryPool full") ;
+			emit(registerSignal("CfeTxDroppedQentryFull"),self) ;
 			delete m ;
 			return ;
 		}
@@ -672,6 +692,7 @@ void CtpForwardingEngine::forward(cPacket* msg){
 		newMsg = messagePool->command_Pool_get() ;
 		if (newMsg == NULL) {
 			collectOutput("Ctp Data","Forward Dropped - messagePool full") ;
+			emit(registerSignal("CfeTxDroppedMessagePoolFull2"),self) ;
 			delete m ;
 			return ;
 		}
@@ -708,6 +729,8 @@ void CtpForwardingEngine::forward(cPacket* msg){
 			return ;
 		} else {
 			collectOutput("Ctp Data","Forward Dropped - sendQueue full") ;
+			emit(registerSignal("CfeTxDroppedSendQueueFull"),self) ;
+
 			// There was a problem enqueuing to the send queue.
 			if(messagePool->command_Pool_put(newMsg) != SUCCESS) trace()<<"put pool error" ;
 			delete qe->msg ;
@@ -1050,7 +1073,7 @@ uint16_t CtpForwardingEngine::command_AMPacket_address(){
  */
 uint16_t CtpForwardingEngine::command_AMPacket_source(cMessage* msg){
 	RoutingPacket* rPkt = check_and_cast<RoutingPacket*>(msg) ;
-	return (uint16_t) rPkt->getRoutingInteractionControl().lastHop ;
+	return (uint16_t) rPkt->getNetMacInfoExchange().lastHop ;
 }
 
 /*
@@ -1077,8 +1100,8 @@ void CtpForwardingEngine::encapsulatePacket(CtpData * netPkt, cPacket * appPkt)
 	// Castalia standard routing fields.
 	netPkt->setByteLength(ctpFeHeaderSize);
 	netPkt->setKind(NETWORK_LAYER_PACKET);
-	netPkt->getRoutingInteractionControl().source = selfAddress.c_str() ; // ok
-	netPkt->getRoutingInteractionControl().lastHop = self ; // ok
+	netPkt->setSource(selfAddress.c_str()) ; // ok
+	netPkt->getNetMacInfoExchange().lastHop = self ; // ok
 
 	// CTP Data fields
 	netPkt->setOptions(netPkt->getOptions() | 0x01) ;

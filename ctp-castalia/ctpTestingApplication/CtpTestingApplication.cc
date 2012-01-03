@@ -13,7 +13,7 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.0 (January 27, 2011)
+ * @version 1.01 (January 3, 2012)
  */
 
 #include "CtpTestingApplication.h"
@@ -39,10 +39,12 @@ void CtpTestingApplication::startup()
 		setTimer(SEND_PACKET, packet_spacing + startupDelay);
 	else
 		trace() << "Not sending packets";
+
+	declareOutput("My Stats") ;
 }
 
-void CtpTestingApplication::fromNetworkLayer(ApplicationGenericDataPacket * rcvPacket,
-		const char *source, double rssi, double lqi)
+void CtpTestingApplication::fromNetworkLayer(ApplicationPacket * rcvPacket,
+ 		const char *source, double rssi, double lqi)
 {
 	int sequenceNumber = rcvPacket->getSequenceNumber();
 //	trace() << "Received packet from node " << source << ", SN = " << sequenceNumber;
@@ -63,6 +65,7 @@ void CtpTestingApplication::timerFiredCallback(int index)
 			trace() << "Sending packet with SN " << dataSN;
 			toNetworkLayer(createGenericDataPacket(0, dataSN), par("nextRecipient"));
 			dataSN++;
+			emit(registerSignal("AppTx"),1) ;
 			setTimer(SEND_PACKET, packet_spacing);
 			}
 			break;
@@ -70,30 +73,22 @@ void CtpTestingApplication::timerFiredCallback(int index)
 	}
 }
 
-// This method updates the number of packets received by node 0 from other nodes
-void CtpTestingApplication::update_packets_received(int srcID, int SN)
-{
-	map < int, packet_info >::iterator i = packet_info_table.find(srcID);
-	if (i == packet_info_table.end())
-		declareOutput("Packets received", srcID);
-	packet_info_table[srcID].packets_received[SN]++;
-	if (packet_info_table[srcID].packets_received[SN] == 1)
-		collectOutput("Packets received", srcID);
-}
 
 void CtpTestingApplication::update_ddr_per_sn(int srcID , int SN){
 	map<int,int>::iterator i = packet_ddr_table.find(SN) ;
 	if(i==packet_ddr_table.end()){
 		trace()<<"New entry: "<<SN ;
-		declareOutput("My Stats",SN) ;
+
 	}
 	if(packet_info_table[srcID].packets_received[SN]==1){ //duplicate reception
 		collectOutput("My Stats",SN,"Duplicates") ;
+		emit(registerSignal("AppDuplicateRx"),1) ;
 	}
 	else {
 		packet_info_table[srcID].packets_received[SN]++;
 		packet_ddr_table[SN] += 1 ;
 		collectOutput("My Stats",SN,"DDR") ;
+		emit(registerSignal("AppRx"),1) ;
 	}
 	trace()<<"Received for SN "<<SN<<": "<<packet_ddr_table[SN] ;
 }

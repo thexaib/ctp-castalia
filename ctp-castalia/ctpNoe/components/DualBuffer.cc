@@ -1,14 +1,14 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.01 (April 15, 2011)
+ * @version 1.02 (January 3, 2012)
  *
  * Acknowledgment: This code is based upon the implementation of CTP for TinyOS written by
  * Omprakash Gnawali, Philip Levis, Kyle Jamieson, and Rodrigo Fonseca.
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
  
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -153,7 +153,7 @@ uint8_t DualBuffer::command_Send_send(uint16_t dest , cPacket* pkt){
 	take(pkt) ;// take the ownership of the packet (otherwise cannot send it)
 	trace()<<"Send.Send() - buffering packet." ;
 	RoutingPacket* msg = check_and_cast<RoutingPacket*>(pkt) ;
-	msg->getRoutingInteractionControl().nextHop = dest ;
+	msg->getNetMacInfoExchange().nextHop = dest ;
 
 	/*
 	 * 1) If buffer is empty -> no problem, store it and try to send.
@@ -162,6 +162,15 @@ uint8_t DualBuffer::command_Send_send(uint16_t dest , cPacket* pkt){
 	 *
 	 * 3) If there is no room -> return EBUSY
 	 */
+
+
+	if(sending){
+		if((dynamic_cast<CtpData*>(pkt)!=NULL && justSentMsg==PACKET_FROM_FE)
+				|| (dynamic_cast<CtpLe*>(pkt)!=NULL && justSentMsg==PACKET_FROM_LE)){
+			return EBUSY ;
+		}
+
+	}
 
 	if(dbuffer.empty()){
 		dbuffer.insert(pkt) ;
@@ -212,7 +221,7 @@ void DualBuffer::tryToSend(){
 		cPacket* pkt = check_and_cast<cPacket*>(dbuffer.pop()) ;
 		justSentMsg = (dynamic_cast<CtpLe*>(pkt) != NULL)? PACKET_FROM_LE:PACKET_FROM_FE ;
 		RoutingPacket* msg = check_and_cast<RoutingPacket*>(pkt) ;
-		trace()<<"Sending packet to "<<msg->getRoutingInteractionControl().nextHop;
+		trace()<<"Sending packet to "<<msg->getNetMacInfoExchange().nextHop;
 		send(pkt,"toCtp") ;
 	}
 }

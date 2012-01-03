@@ -13,7 +13,7 @@
  /*
   * @author Ugo Colesanti
   * @author Silvia Santini
-  * @version 1.0 (January 27, 2011)
+  * @version 1.01 (January 3, 2012)
   */
 
 #ifndef _CTPTESTINGAPPLICATION_H_
@@ -49,9 +49,8 @@ class CtpTestingApplication: public VirtualApplication {
 
  protected:
 	void startup();
-	void update_packets_received(int srcID, int SN);
 	void update_ddr_per_sn(int srcID, int SN);
-	void fromNetworkLayer(ApplicationGenericDataPacket *, const char *, double, double);
+	void fromNetworkLayer(ApplicationPacket *, const char *, double, double);
 	void handleRadioControlMessage(RadioControlMessage *);
 	void timerFiredCallback(int);
 };
