@@ -1,14 +1,14 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.01 (April 15, 2011)
+ * @version 1.02 (January 3, 2012)
  *
  * Acknowledgment: This code is based upon the implementation of CTP for TinyOS written by
  * Omprakash Gnawali, Philip Levis, Kyle Jamieson, and Rodrigo Fonseca.
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
  
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -639,7 +639,7 @@ error_t LinkEstimator::command_Send_send(am_addr_t addr, cPacket* pkt) {
 	take(pkt) ; // required in omnet: I cannot send a packet if I'm not the owner.
 	CtpLe* lePkt = new CtpLe() ; // initialize the LinkEstimator packet
 	lePkt->setKind(NETWORK_LAYER_PACKET);
-	lePkt->getRoutingInteractionControl().lastHop = self ; // standard routing packet fields
+	lePkt->getNetMacInfoExchange().lastHop = self ; // standard routing packet fields
 	uint8_t ovhd = addLinkEstHeaderAndFooter(lePkt,(uint8_t)pkt->getByteLength()); // add the header and dynamically adds the size of the footer. Note that actually there is no footer but just a bigger header.
 	lePkt->setByteLength(ovhd) ;
 	lePkt->encapsulate(pkt) ;
@@ -805,12 +805,12 @@ bool LinkEstimator::signal_CompareBit_shouldInsert(cPacket* pkt, bool white_bit)
 
 am_addr_t LinkEstimator::command_SubAMPacket_destination(cPacket* msg){
 	RoutingPacket* pkt = check_and_cast<RoutingPacket*>(msg) ;
-	return pkt->getRoutingInteractionControl().nextHop ;
+	return pkt->getNetMacInfoExchange().nextHop ;
 }
 
 am_addr_t LinkEstimator::command_SubAMPacket_source(cPacket* msg){
 	RoutingPacket* pkt = check_and_cast<RoutingPacket*>(msg) ;
-	return pkt->getRoutingInteractionControl().lastHop ;
+	return pkt->getNetMacInfoExchange().lastHop ;
 }
 
 /*
@@ -822,7 +822,7 @@ am_addr_t LinkEstimator::command_SubAMPacket_source(cPacket* msg){
  */
 bool LinkEstimator::command_LinkPacketMetadata_highChannelQuality(cPacket* msg) {
 	RoutingPacket* pkt = check_and_cast<RoutingPacket*>(msg) ;
-	return (pkt->getRoutingInteractionControl().LQI > 105.0) ;
+	return (pkt->getNetMacInfoExchange().LQI > 105.0) ;
 }
 
 //////////////////////////////////////////////////////////////

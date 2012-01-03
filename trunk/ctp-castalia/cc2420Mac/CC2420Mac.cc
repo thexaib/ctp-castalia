@@ -1,14 +1,14 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.0 (January 27, 2011)
+ * @version 1.01 (January 3, 2012)
  *
  * Acknowledgment: This code is based upon the implementation of CC2420Transmit TinyOS component
  * written by Jonathan Hui, David Moss, and Jung Il Choi.
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
  
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -497,10 +497,10 @@ void CC2420Mac::event_CC2420Receive_receive(cPacket * incoming_msg){
 			 *  - LQI and RSSI propagates the corresponding fields of the MAC layer.
 			 */
 			RoutingPacket* msg = check_and_cast<RoutingPacket*>(msg_hdr->decapsulate()) ;
-			msg->getRoutingInteractionControl().nextHop = msg_hdr->getDest() ;
-			msg->getRoutingInteractionControl().lastHop = msg_hdr->getSrc() ;
-			msg->getRoutingInteractionControl().LQI = msg_hdr->getMacInteractionControl().RSSI ;
-			msg->getRoutingInteractionControl().RSSI = msg_hdr->getMacInteractionControl().LQI ;
+			msg->getNetMacInfoExchange().nextHop = msg_hdr->getDest() ;
+			msg->getNetMacInfoExchange().lastHop = msg_hdr->getSrc() ;
+			msg->getNetMacInfoExchange().LQI = msg_hdr->getMacRadioInfoExchange().LQI ;
+			msg->getNetMacInfoExchange().RSSI = msg_hdr->getMacRadioInfoExchange().RSSI ;
 			toNetworkLayer(msg) ;
 
 			// release SpiResource only if no ack is being transmitted

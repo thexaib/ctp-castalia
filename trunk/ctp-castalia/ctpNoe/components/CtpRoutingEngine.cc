@@ -1,14 +1,14 @@
 /*
  * @author Ugo Colesanti
  * @author Silvia Santini
- * @version 1.01 (April 15, 2011)
+ * @version 1.02 (January 3, 2012)
  *
  * Acknowledgment: This code is based upon the implementation of CTP for TinyOS written by
  * Omprakash Gnawali, Philip Levis, Kyle Jamieson, and Rodrigo Fonseca.
  */
 
 /*
- * Copyright (c) 2011 Sapienza University of Rome.
+ * Copyright (c) 2012 Sapienza University of Rome.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  */
  
 /*
- * Copyright (c) 2011 ETH Zurich.
+ * Copyright (c) 2012 ETH Zurich.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -443,11 +443,12 @@ void CtpRoutingEngine::sendBeaconTask() {
 
 	trace()<<"sendBeaconTask - parent: "<<(int)beaconMsg->getParent()<<" etx: "<<(int)beaconMsg->getEtx();
 
-	beaconMsg->getRoutingInteractionControl().lastHop = self ; // ok
+	beaconMsg->getNetMacInfoExchange().lastHop = self ; // ok
 	eval = le->command_Send_send(AM_BROADCAST_ADDR,beaconMsg->dup()); // the duplicate will be deleted in the LE module, we keep a copy here that is reused each time.
 
 	if (eval == SUCCESS) {
 		//statistics
+		emit(registerSignal("BeaconTx"),self) ;
 		collectOutput("Ctp Beacons","Tx") ;
 		sending = true;
 	} else if (eval == EOFF) {
@@ -508,6 +509,14 @@ void CtpRoutingEngine::event_BeaconReceive_receive(cPacket* msg) {
 
 	//need to get the am_addr_t of the source
 	from = command_AMPacket_source(msg) ;
+
+	//statistics
+	beaconRx brx;
+	brx.id = self ;
+	brx.from = from ;
+	emit(registerSignal("BeaconRx"),&brx) ;
+
+
 	CtpBeacon* rcvBeacon = check_and_cast<CtpBeacon*>(msg) ;
 
 	congested = command_CtpRoutingPacket_getOption(msg,CTP_OPT_ECN) ;
@@ -885,7 +894,7 @@ void CtpRoutingEngine::signal_Routing_noRoute(){
  */
 am_addr_t CtpRoutingEngine::command_AMPacket_source(cMessage* msg){
 	RoutingPacket* rPkt = check_and_cast<RoutingPacket*>(msg) ;
-	return (uint16_t) rPkt->getRoutingInteractionControl().lastHop ;
+	return (uint16_t) rPkt->getNetMacInfoExchange().lastHop ;
 }
 
 am_addr_t CtpRoutingEngine::command_AMPacket_address(){
